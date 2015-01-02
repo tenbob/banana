@@ -1,3 +1,5 @@
+' This is my third commit
+
 Option Explicit
 Dim rownum, colnum, firstrow, lastrow, filenum, i, response As Integer
 Dim errmsg, myfile, newstring, crlf2 As String
