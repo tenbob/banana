@@ -3,8 +3,14 @@ Dim rownum, colnum, firstrow, lastrow, filenum, i, response As Integer
 Dim errmsg, myfile, newstring, crlf2 As String
 Dim range1, range2 As Range
 
-
 Sub WriteDXF()
+' This function writes the DXF file. The user has entered all the data on the input spreadsheet.
+' We now check how many rows of data are present, fill in any blanks values for the crown spread
+' and validate the data. We then copy it to the working spreadsheet which contains formulae to
+' automatically generate the required text strings. Note that the token '@' is used to represent
+' CRLF at this stage. We write out the data to the DXF file specified by the user, expanding @ to
+' CRLF as we go. Finally we clean up by deleting all user data in the working sheet and reapplying
+' the hidden and protected settings.  R E Barrett, Jan 2015
 crlf2 = vbCrLf & vbCrLf
 Debug.Print crlf2 & "++++++++ New run +++++++++++++++" & Now()
 ' How many rows of data has the user entered? Top left of the table is labelled "start".
@@ -17,7 +23,6 @@ firstrow = range1.Row
 lastrow = firstrow + range1.Rows.Count - 1
 End With
 Debug.Print "Bounds of user's table", firstrow, lastrow, range1.Address
-
 
 ' Validate all user input for correct data type
 For rownum = firstrow To lastrow
@@ -65,17 +70,16 @@ For rownum = firstrow To lastrow
   colnum = Range("crownNW").Column
   If Not (IsNumeric(Cells(rownum, colnum))) Then GoTo DataInvalid
   
-  ' Convert the tree category to upper case and validate it as A, B, C, or R
+  ' Convert the tree category to upper case and validate it as A, B, C, or U
   colnum = Range("category").Column
   Cells(rownum, colnum) = UCase(Cells(rownum, colnum))
   Select Case Cells(rownum, colnum)
-  Case "A", "B", "C", "R"
+  Case "A", "B", "C", "U"
   Case Else
     GoTo DataInvalid
   End Select
   
 Next rownum
-
 
 ' Fill in any gaps in the table for crown spread. User must enter N, E, S and W values.
 ' Intermediate points are optional. If absent, the program inserts the average of adjacent points in red.
@@ -107,7 +111,6 @@ If IsEmpty(.Cells(rownum, colnum)) Then
 End If
 Next
 End With
-
 
 ' Ensure adjustment values contain valid numbers
 rownum = Range("deltaX").Row
@@ -191,7 +194,6 @@ response = MsgBox(errmsg, vbOKOnly + vbCritical, "Fatal error")
 
 ' Final cleanup.
 ' In the input sheet we protect the sheet and enable selection of unlocked cells only.
-' Currently there is no password, so the user could easily reverse these changes. We may add one later.
 ' In the working sheet we clear out all the data we wrote, then make sure it's still hidden.
 ' We protect the workbook so it can't be made visible again. "working" is not protected at sheet level.
 
@@ -205,8 +207,5 @@ ActiveWorkbook.Protect Structure:=False, Password:="larch"
 Worksheets("working").Visible = False
 ActiveWorkbook.Protect Structure:=True, Password:="larch"
 
-
 Debug.Print "All sheets secured"
 End Sub
-
-
