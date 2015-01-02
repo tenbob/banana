@@ -1,0 +1,212 @@
+Option Explicit
+Dim rownum, colnum, firstrow, lastrow, filenum, i, response As Integer
+Dim errmsg, myfile, newstring, crlf2 As String
+Dim range1, range2 As Range
+
+
+Sub WriteDXF()
+crlf2 = vbCrLf & vbCrLf
+Debug.Print crlf2 & "++++++++ New run +++++++++++++++" & Now()
+' How many rows of data has the user entered? Top left of the table is labelled "start".
+With Worksheets("input")
+.Unprotect Password:="larch"
+Set range1 = .Range("start").CurrentRegion ' gets bounding box of all contiguous data around start
+' lose the headers and make sure table is the full 15 column width
+Set range1 = range1.Offset(2, 0).Resize(range1.Rows.Count - 2, 15)
+firstrow = range1.Row
+lastrow = firstrow + range1.Rows.Count - 1
+End With
+Debug.Print "Bounds of user's table", firstrow, lastrow, range1.Address
+
+
+' Validate all user input for correct data type
+For rownum = firstrow To lastrow
+
+  'Ensure the x and y columns contain numbers and are not empty
+  colnum = Range("x").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("y").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("ident").Column
+  If IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("height").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("stems").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("dia").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("crownN").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("crownNE").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Then GoTo DataInvalid
+  
+  colnum = Range("crownE").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("crownSE").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Then GoTo DataInvalid
+  
+  colnum = Range("crownS").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+
+  colnum = Range("crownSW").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Then GoTo DataInvalid
+  
+  colnum = Range("crownW").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+  
+  colnum = Range("crownNW").Column
+  If Not (IsNumeric(Cells(rownum, colnum))) Then GoTo DataInvalid
+  
+  ' Convert the tree category to upper case and validate it as A, B, C, or R
+  colnum = Range("category").Column
+  Cells(rownum, colnum) = UCase(Cells(rownum, colnum))
+  Select Case Cells(rownum, colnum)
+  Case "A", "B", "C", "R"
+  Case Else
+    GoTo DataInvalid
+  End Select
+  
+Next rownum
+
+
+' Fill in any gaps in the table for crown spread. User must enter N, E, S and W values.
+' Intermediate points are optional. If absent, the program inserts the average of adjacent points in red.
+With Worksheets("input")
+For rownum = firstrow To lastrow
+colnum = .Range("crownNE").Column
+If IsEmpty(.Cells(rownum, colnum)) Then
+  .Cells(rownum, colnum) = (.Cells(rownum, colnum - 1) + .Cells(rownum, colnum + 1)) / 2
+  .Cells(rownum, colnum).Font.ColorIndex = 3
+  Debug.Print "Added crown data ", .Cells(rownum, colnum)
+End If
+colnum = .Range("crownSE").Column
+If IsEmpty(.Cells(rownum, colnum)) Then
+  .Cells(rownum, colnum) = (.Cells(rownum, colnum - 1) + .Cells(rownum, colnum + 1)) / 2
+  .Cells(rownum, colnum).Font.ColorIndex = 3
+  Debug.Print "Added crown data ", .Cells(rownum, colnum)
+End If
+colnum = .Range("crownSW").Column
+If IsEmpty(.Cells(rownum, colnum)) Then
+  .Cells(rownum, colnum) = (.Cells(rownum, colnum - 1) + .Cells(rownum, colnum + 1)) / 2
+  .Cells(rownum, colnum).Font.ColorIndex = 3
+  Debug.Print "Added crown data ", .Cells(rownum, colnum)
+End If
+colnum = .Range("crownNW").Column
+If IsEmpty(.Cells(rownum, colnum)) Then
+  .Cells(rownum, colnum) = (.Cells(rownum, colnum - 1) + .Cells(rownum, colnum - 7)) / 2
+  .Cells(rownum, colnum).Font.ColorIndex = 3
+  Debug.Print "Added crown data ", .Cells(rownum, colnum)
+End If
+Next
+End With
+
+
+' Ensure adjustment values contain valid numbers
+rownum = Range("deltaX").Row
+colnum = Range("deltaX").Column
+If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+rownum = Range("deltaY").Row
+colnum = Range("deltaY").Column
+If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+rownum = Range("theta").Row
+colnum = Range("theta").Column
+If Not (IsNumeric(Cells(rownum, colnum))) Or IsEmpty(Cells(rownum, colnum)) Then GoTo DataInvalid
+  
+' Data checks are complete. We can now copy the data to the working spreadsheet.
+
+' Copy block of user data from input to working
+With Worksheets("working")
+.Range("startw").Resize(range1.Rows.Count, range1.Columns.Count).Value = range1.Value
+Debug.Print "Data copied to ", .Range("startw").Resize(range1.Rows.Count, range1.Columns.Count).Address
+' Copy adjustment values
+.Range("deltaX") = Worksheets("input").Range("deltaX")
+.Range("deltaY") = Worksheets("input").Range("deltaY")
+.Range("theta") = Worksheets("input").Range("theta")
+
+' Ask user for DXF output file name and open it. Note that the Mac needs different code from the PC.
+' On the Mac many features of the SaveAs dialog don't work, eg title, filters, proposed filename. Also the Mac
+' insists that the file extension must be XLS or somesuch. You can override this later. The Mac warns you
+' automatically if the file already exists.
+If Application.OperatingSystem Like "*Mac*" Then 'we're on a Mac
+  myfile = Application.GetSaveAsFilename("")
+  If myfile = False Then
+    response = MsgBox("Cancelled. No data written", vbOKOnly + vbCritical, "Cancelled")
+    GoTo CleanUp
+  End If
+Else ' We're on Windows, so we use the richer SaveAs dialog and check explicitly if the file exists
+  myfile = Application.GetSaveAsFilename("output.dxf", "DXF Files (*.dxf), *.dxf, All Files (*.*),*.*", , "Output file name")
+    If myfile = False Then
+    response = MsgBox("Cancelled. No data written", vbOKOnly + vbCritical, "Cancelled")
+    GoTo CleanUp
+  End If
+  If Dir(myfile) <> "" Then
+    errmsg = myfile & crlf2 & "File already exists. Do you want to overwrite it?"
+    If MsgBox(errmsg, vbOKCancel, "File exists") = vbCancel Then
+      response = MsgBox("Cancelled. No data written", vbOKOnly + vbCritical, "Cancelled")
+      GoTo CleanUp
+    End If
+  End If
+End If
+
+filenum = FreeFile
+Open myfile For Binary As #filenum
+Debug.Print "Filename successfully opened ", myfile
+    
+' File is open, so we write the character strings, changing @ to CRLF as we go.
+' Intro section of DXF file
+newstring = .Range("dxfpart1")
+Debug.Print "Output string is ", newstring
+Put #filenum, , Replace(newstring, "@", vbCrLf) & vbCrLf
+' Entities section of DXF, repeated up to 100 times
+For i = 0 To lastrow - firstrow
+  newstring = .Range("dxfpart2").Offset(i, 0)
+  Debug.Print "Output string is ", newstring
+  Put #filenum, , Replace(newstring, "@", vbCrLf) & vbCrLf
+Next i
+' Closing section of DXF
+newstring = .Range("dxfpart999")
+Debug.Print "Output string is ", newstring
+Put #filenum, , Replace(newstring, "@", vbCrLf) & vbCrLf
+End With
+
+' We're done
+Close #filenum
+errmsg = "File written" & crlf2 & myfile
+response = MsgBox(errmsg, vbOKOnly + vbInformation)
+GoTo CleanUp
+
+DataInvalid:
+' Land here if data validation checks fail
+Cells(rownum, colnum).Select
+errmsg = "Invalid data in cell " & Cells(rownum, colnum).Address(rowabsolute:=False, columnabsolute:=False)
+response = MsgBox(errmsg, vbOKOnly + vbCritical, "Fatal error")
+
+' Final cleanup.
+' In the input sheet we protect the sheet and enable selection of unlocked cells only.
+' Currently there is no password, so the user could easily reverse these changes. We may add one later.
+' In the working sheet we clear out all the data we wrote, then make sure it's still hidden.
+' We protect the workbook so it can't be made visible again. "working" is not protected at sheet level.
+
+CleanUp:
+Worksheets("input").Protect Password:="larch", AllowFormattingCells:=True
+Worksheets("input").EnableSelection = xlUnlockedCells
+
+Worksheets("working").Range("allw").ClearContents
+Worksheets("working").Range("adjw").ClearContents
+ActiveWorkbook.Protect Structure:=False, Password:="larch"
+Worksheets("working").Visible = False
+ActiveWorkbook.Protect Structure:=True, Password:="larch"
+
+
+Debug.Print "All sheets secured"
+End Sub
+
+
